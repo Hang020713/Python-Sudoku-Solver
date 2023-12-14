@@ -1,14 +1,25 @@
-def get_grid_number(r, c):
-    return int(r/3) * 3 + int(c/3)
+import time
+import itertools
+from pprint import pprint
 
-def create_empty_map():
-    map = []
+'''
+unit: box, row, col, grid
+Index: start from 0
+Box: 0 1 2
+     3 4 5
+     6 7 8
+sudoku[y][x]
+'''
+
+'''Helper functions'''
+def create_empty_sudoku():
+    sudoku = []
     for r in range(9):
-        map.append([0] * 9)
+        sudoku.append([0] * 9)
 
-    return map
+    return sudoku
 
-def print_map(map):
+def print_sudoku(sudoku):
     row = 0
     col = 0
     for r in range(9):
@@ -21,197 +32,524 @@ def print_map(map):
             if(col == 0):
                 print("| ", end="")
 
-            print(map[r][c], "", end="")
+            print(sudoku[r][c], "", end="")
             col += 1
 
         print("|")
         row += 1
     print("-"*25)
 
-def scanning(map, action_log):
-    #Make a map check
-    for n in range(1, 10):
-        check_map = create_empty_map()
-        #print("[Scanning] Now checking", n)
+def getBoxXYFromBoxNum(box):    
+    x = box % 3 * 3
+    y = int(box / 3) * 3
+    return [x, y]
 
+def getBoxNumFromXY(x, y):
+    return int(y / 3) * 3 + int(x / 3)
+
+def getBoxXYFromXY(x, y):
+    return getBoxXYFromBoxNum(getBoxNumFromXY(x, y))
+
+def getBoxRemainingNumber(box):
+    box = getBoxXYFromBoxNum(box)
+    checking = [item for item in range(1, 10)]
+
+    for r in range(box[1], box[1] + 3):
+        for c in range(box[0], box[0] + 3):
+            if(modified_sudoku[r][c] != 0):
+                checking.remove(modified_sudoku[r][c])
+
+def countElement(list, element):
+    count = 0
+    for i in range(len(list)):
+        if(list[i] == element):
+            count += 1
+    
+    return count
+
+#This function will loop number by number
+#Check filled sudoku is there one remaining grid
+#0 for empty, 1 for filled
+def last_remaining_cell():
+    for n in range(1, 10):
+        #A empty sudoku for storing filled grid
+        checking = create_empty_sudoku()
+
+        #Start filling
         for r in range(9):
             for c in range(9):
-                #Have other number
-                if(not map[r][c] == 0):
-                    check_map[r][c] = 1
+                val = modified_sudoku[r][c]
+                if(val == n):
+                    #Fill box
+                    box = getBoxXYFromXY(c, r)
+                    for gr in range(3):
+                        for gc in range(3):
+                            checking[box[1] + gr][box[0] + gc] = 1
+                    
+                    #Fill row
+                    for rr in range(9):
+                        checking[rr][c] = 1
 
-                #Same Number
-                if(map[r][c] == n):
-                    #Found same, put it into check map
-                    #Fill row & col
-                    for f in range(9):
-                        check_map[r][f] = 1
-                        check_map[f][c] = 1
+                    #Fill col
+                    for cc in range(9):
+                        checking[r][cc] = 1
+                elif(val != 0):
+                    checking[r][c] = 1
 
-                    #Fill grid
-                    gr = int(get_grid_number(r, c) / 3) * 3
-                    gc = int(get_grid_number(r, c) % 3) * 3
-                    for cr in range(3):
-                        for cc in range(3):
-                            check_map[gr+cr][gc+cc] = 1
+        #Check remaining one grid
+        #Box
+        for b in range(9):
+            count = 0
+            box = getBoxXYFromBoxNum(b)
+            last_empty_grid = [-1, -1]
+            #Find 0 amount
+            for r in range(box[1], box[1] + 3):
+                for c in range(box[0], box[0] + 3):
+                    if(checking[r][c] == 0):
+                        count += 1
+                        last_empty_grid[0] = c
+                        last_empty_grid[1] = r
+
+            #If amount == 1, then fill it
+            if(count == 1):
+                modified_sudoku[last_empty_grid[1]][last_empty_grid[0]] = n
+                action_log.append([
+                    "last_remaining_cell_box",
+                    last_empty_grid[0],
+                    last_empty_grid[1],
+                    n
+                ])
+                getNotes()
+                return True
         
-        #Check is there only 1 empty in grid
-        '''
-        Sample
-        1 1 1
-        1 1 1
-        1 0 1
-        '''
-        '''
-        0-2, 3-5, 6-8
-        '''
-        #g for grid top-left position
-        #suppose to be 0, 3, 6
-        for gr in range(0, 7, 3):
-            for gc in range(0, 7, 3):
-                last_empty_pos = { "x":-1, "y":-1 }
-                empty_count = 0
-                for cr in range(3):
-                    for cc in range(3):
-                        if(check_map[gr+cr][gc+cc] == 1):
-                            empty_count += 1
-                        else:
-                            last_empty_pos['x'] = gc+cc
-                            last_empty_pos['y'] = gr+cr
-                if(empty_count == 8):
-                    '''
-                    print("[Scanning] Found one,",
-                          "num:", n,
-                          ", grid:", get_grid_number(gr, gc), 
-                          ", r:", last_empty_pos['y'],
-                          ", c:", last_empty_pos['x'])
-                    '''
-                    action_log.append({
-                        "action": "scanning",
-                        "number": n,
-                        "grid": get_grid_number(gr, gc),
-                        "row": last_empty_pos['y'],
-                        "col": last_empty_pos['x']
-                    })
+        #Row
+        for r in range(9):
+            count = 0
+            last_empty_grid = [-1, -1]
+            #Find 0 amount
+            for c in range(9):
+                if(checking[r][c] == 0):
+                    count += 1
+                    last_empty_grid[0] = c
+                    last_empty_grid[1] = r
 
-                    #Fill
-                    #print('[Scanning] Before:')
-                    #print_map(map)
-                    #print('[Scanning] After:')
-                    map[last_empty_pos['y']][last_empty_pos['x']] = n
-                    #print_map(map)
-                    return True
+            #If amount == 1, then fill it
+            if(count == 1):
+                modified_sudoku[last_empty_grid[1]][last_empty_grid[0]] = n
+                action_log.append([
+                    "last_remaining_cell_row",
+                    last_empty_grid[0],
+                    last_empty_grid[1],
+                    n
+                ])
+                getNotes()
+                return True
+        
+        #Col
+        for c in range(9):
+            count = 0
+            last_empty_grid = [-1, -1]
+            #Find 0 amount
+            for r in range(9):
+                if(checking[r][c] == 0):
+                    count += 1
+                    last_empty_grid[0] = c
+                    last_empty_grid[1] = r
 
+            #If amount == 1, then fill it
+            if(count == 1):
+                modified_sudoku[last_empty_grid[1]][last_empty_grid[0]] = n
+                action_log.append([
+                    "last_remaining_cell_row",
+                    last_empty_grid[0],
+                    last_empty_grid[1],
+                    n
+                ])
+                getNotes()
+                return True
+    
     return False
 
-def single_candidate(map, action_log):
-    #Search square by square
+#0 for possible, 1 for filled
+def getNote(x, y):
+    if(modified_sudoku[y][x] != 0):
+        return []
+
+    #Index - 1
+    possible = [0] * 9
+
+    #Loop Box
+    box = getBoxXYFromXY(x, y)
+    for gr in range(box[1], box[1] + 3):
+        for gc in range(box[0], box[0] + 3):
+            val = modified_sudoku[gr][gc]
+            if(val != 0):
+                possible[val - 1] = 1
+                
+    #Loop Row
+    for gr in range(9):
+        val = modified_sudoku[gr][x]
+        if(val != 0):
+            possible[val - 1] = 1
+
+    #Loop Col
+    for gc in range(9):
+        val = modified_sudoku[y][gc]
+        if(val != 0):
+            possible[val - 1] = 1
+
+    return possible
+
+def create_empty_sudoku_note():
+    sudoku_note.clear()
+    for r in range(9):
+        sudoku_note.append([] * 9)
+        for c in range(9):
+            sudoku_note[r].append([] * 9)
+
+    return sudoku_note
+
+def getNotes():
+    create_empty_sudoku_note()
+
+    #Loop through grid and get all notes
     for r in range(9):
         for c in range(9):
-            #Already have number
-            if(not map[r][c] == 0):
-                continue
+            sudoku_note[r][c] = getNote(c, r)
 
-            #Check number
-            check_number = 0
-            check_number_list = [False] * 9
+def getNoteNumbers(sets):
+    numbers = []
+    for i in range(len(sets)):
+        if(sets[i] == 0):
+            numbers.append(i+1)
+    return numbers
 
-            #Search col & row
-            for p in range(9):
-                if(not map[r][p] == 0):
-                    if(not check_number_list[map[r][p] - 1]):
-                        check_number += 1
-                        check_number_list[map[r][p] - 1] = True
+def print_notes():
+    for r in range(9):
+        for c in range(9):
+            numbers = getNoteNumbers(sudoku_note[r][c])
+            print("X:", c, ", Y:", r, ":", numbers)
 
-                if(not map[p][c] == 0):
-                    if(not check_number_list[map[p][c] - 1]):
-                        check_number += 1
-                        check_number_list[map[p][c] - 1] = True
+def getDistinctNumberNotes(notes):
+    found = []
+    for i in range(len(notes)):
+        for k in range(len(notes[i])):
+            if(not notes[i][k] in found):
+                found.append(notes[i][k])
+    return found
 
-            #Search grid
-            gr = int(get_grid_number(r, c) / 3) * 3
-            gc = int(get_grid_number(r, c) % 3) * 3
-            for cr in range(3):
-                for cc in range(3):
-                    #print(gr + cr, gc + cc)
-                    if(not map[gr + cr][gc + cc] == 0):
-                        if(not check_number_list[map[gr + cr][gc + cc] - 1]):
-                            check_number += 1
-                            check_number_list[map[gr + cr][gc + cc] - 1] = True
+#Note2 is subset of note1
+def isSubset(note1, note2):
+    for i in range(len(note2)):
+        if(not note2[i] in note1):
+            return False
+    return True
 
-            #Check last
-            if(check_number == 8):
-                last_num = 1
-                for p in check_number_list:
-                    if(not p):
-                       break
-                    
-                    last_num += 1
-
-                map[r][c] = last_num
-
-                '''
-                print("[Single Candidate] Found",
-                      ", number:", last_num,
-                      ", grid:", get_grid_number(r, c),
-                      ", r:", r,
-                      ", c:", c)
-                '''
-                
-                action_log.append({
-                    "action": "single_candidate",
-                    "number": last_num,
-                    "row": r,
-                    "col": c
-                })
+def obvious():
+    #Loop through grid and get all notes
+    for r in range(9):
+        for c in range(9):
+            #obvious singles
+            if(countElement(sudoku_note[r][c], 0) == 1):
+                modified_sudoku[r][c] = sudoku_note[r][c].index(0) + 1
+                action_log.append([
+                    "obvious_singles",
+                    c,
+                    r,
+                    sudoku_note[r][c].index(0) + 1
+                ])
+                getNotes()  #Reset notes
                 return True
 
-    return False
-
-def eliminating_number(map, action_log):
-    #Make a check map pin all number
-    ori_check_map = create_empty_map()
+    #Pairs
+    '''
+    obvious pairs: check empty & remove other have same numbers
+    '''
     for r in range(9):
         for c in range(9):
-            if(not map[r][c] == 0):
-                ori_check_map[r][c] = 1
+            #First, find a note with only length is 2
+            if(countElement(sudoku_note[r][c], 0) == 2):
+                removed = False
+                same_notes_grid = [
+                    [c, r]
+                ]
+                pairs_number = getNoteNumbers(sudoku_note[r][c])
+                removed_location = []
+                
+                #Then find another more pair is same notes, with same unit
+                #If so, then remove other same number from same unit notes
+                #Row
+                for rr in range(9):
+                    if(countElement(sudoku_note[rr][c], 0) == 2 
+                       and sudoku_note[r][c] == sudoku_note[rr][c] 
+                       and rr != r):
+                        print("found row match")
+                        print(c, rr, sudoku_note[rr][c])
+                        print(c, r, sudoku_note[r][c])
+                        same_notes_grid.append([c, rr])
+                        
+                        #Is them the same box?
+                        if(getBoxNumFromXY(c, r) == getBoxNumFromXY(c, rr)):
+                            box = getBoxXYFromXY(c, r)
+                            for gr in range(box[1], box[1] + 3):
+                                for gc in range(box[0], box[0] + 3):
+                                    #Check it's not r and rr
+                                    if(gc == c and (gr == r or gr == rr)):
+                                        continue
+                                    #Also not filled blank
+                                    if(modified_sudoku[gr][gc] != 0):
+                                        continue
+                                        
+                                    #Remove if they noted
+                                    for i in range(len(pairs_number)):
+                                        if(sudoku_note[gr][gc][pairs_number[i] - 1] == 0):
+                                            removed = True
+                                            removed_location.append([gc, gr])
+                                        sudoku_note[gr][gc][pairs_number[i] - 1] = 1
+                            if(removed):
+                                action_log.append([
+                                    "obvious_pairs_box",
+                                    same_notes_grid,
+                                    pairs_number,
+                                    removed_location
+                                ])
+                                return True
+
+                        #Clear Row
+                        for rrr in range(9):
+                            if(rrr == rr or rrr == r):
+                                continue
+                            if(modified_sudoku[rrr][c] != 0):
+                                continue
+
+                            for i in range(len(pairs_number)):
+                                if(sudoku_note[rrr][c][pairs_number[i] - 1] == 0):
+                                    removed = True
+                                    removed_location.append([c, rrr])
+                                sudoku_note[rrr][c][pairs_number[i] - 1] = 1
+                        if(removed):
+                            action_log.append([
+                                "obvious_pairs_row",
+                                same_notes_grid,
+                                pairs_number,
+                                removed_location
+                            ])
+                            return True
+
+                #Col
+                for cc in range(9):
+                    if(countElement(sudoku_note[r][cc], 0) == 2
+                       and sudoku_note[r][c] == sudoku_note[r][cc]
+                       and cc != c):
+                        print("found col match")
+                        print(c, r, sudoku_note[r][c])
+                        print(cc, r, sudoku_note[r][cc])
+                        same_notes_grid.append([cc, r])
+
+                        #Is them the same box?
+                        if(getBoxNumFromXY(c, r) == getBoxNumFromXY(cc, r)):
+                            box = getBoxXYFromXY(c, r)
+                            for gr in range(box[1], box[1] + 3):
+                                for gc in range(box[0], box[0] + 3):
+                                    #Check it's not r and rr
+                                    if(gr == r and (gc == c or gc == cc)):
+                                        continue
+                                    #Also not filled blank
+                                    if(modified_sudoku[gr][gc] != 0):
+                                        continue
+                                        
+                                    #Remove if they noted
+                                    for i in range(len(pairs_number)):
+                                        if(sudoku_note[gr][gc][pairs_number[i] - 1] == 0):
+                                            removed = True
+                                            removed_location.append([gc, gr])
+                                        sudoku_note[gr][gc][pairs_number[i] - 1] = 1
+                            if(removed):
+                                action_log.append([
+                                    "obvious_pairs_box",
+                                    same_notes_grid,
+                                    pairs_number,
+                                    removed_location
+                                ])
+                                return True
+
+                        #Clear Col
+                        for ccc in range(9):
+                            if(ccc == cc or ccc == c):
+                                continue
+                            if(modified_sudoku[r][ccc] != 0):
+                                continue
+
+                            for i in range(len(pairs_number)):
+                                if(sudoku_note[r][ccc][pairs_number[i] - 1] == 0):
+                                    removed = True
+                                    removed_location.append([ccc, r])
+                                sudoku_note[r][ccc][pairs_number[i] - 1] = 1
+                        if(removed):
+                            action_log.append([
+                                "obvious_pairs_col",
+                                same_notes_grid,
+                                pairs_number,
+                                removed_location
+                            ])
+                            return True
+
+                #Box
+                for b in range(9):
+                    box = getBoxXYFromBoxNum(b)
     
-    print_map(ori_check_map)
+    #Triples
+    '''
+    condition: have two same combination in same row/col/grid
+        obvious triples:
+        condition:
+        (123) (123) (123) - {3/3/3} (in terms of candidates per cell)
+        (123) (123) (12) - {3/3/2} (or some combination thereof)å
+        (123) (12) (23) - {3/2/2}
+        (12) (23) (13) - {2/2/2}
+    '''
+    for b in range(9):
+        removed_location = []
+        box = getBoxXYFromBoxNum(b)
+        box_notes = []
+        for gr in range(box[1], box[1] + 3):
+            for gc in range(box[0], box[0] + 3):
+                box_notes.append(getNoteNumbers(sudoku_note[gr][gc]))
+        box_notes_combination = [list(p) for p in itertools.combinations(box_notes, 3)]
+        for i in range(len(box_notes_combination)):
+            #Check all notes have at least length 2
+            check = False
+            for k in range(3):
+                if(len(box_notes_combination[i][k]) < 2 or len(box_notes_combination[i][k]) > 3):
+                    check = True
+            if(check):
+                continue
+
+            distinct_notes = getDistinctNumberNotes(box_notes_combination[i])
+            if(len(distinct_notes) == 3):
+                print("Found Triples", box_notes_combination[i], distinct_notes)
+
+                #Remove same number from box
+                for gr in range(box[1], box[1] + 3):
+                    for gc in range(box[0], box[0] + 3):
+                        #Loop distinct notes
+                        if(modified_sudoku[gr][gc] != 0):
+                            continue
+
+                        if(not isSubset(distinct_notes, sudoku_note[gr][gc])):
+                            #Remove number!
+                            removed = False
+
+                            for n in range(3):
+                                if(sudoku_note[gr][gc][distinct_notes[n] - 1] == 0):
+                                    removed = True
+                                    removed_location.append([gc, gr])
+                                sudoku_note[gr][gc][distinct_notes[n] - 1] = 1
+                            
+                            if(removed):
+                                action_log.append([
+                                    "obvious_triples_box",
+                                    same_notes_grid,
+                                    [
+                                        b
+                                        ,box_notes_combination[i]
+                                    ],
+                                    removed_location
+                                ])
+                                return True
 
     return False
 
-#sudoku data[y][x]
-#0 for empty
-map = [
-    [0, 0, 0, 1, 0, 4, 0, 0, 0],
-    [0, 0, 1, 0, 0, 0, 9, 0, 0],
-    [0, 9, 0, 7, 0, 3, 0, 6, 0],
-    [8, 0, 7, 0, 0, 0, 1, 0, 6],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [3, 0, 4, 0, 0, 0, 5, 0, 9],
-    [0, 5, 0, 4, 0, 2, 0, 3, 0],
-    [0, 0, 8, 0, 0, 0, 6, 0, 0],
-    [0, 0, 0, 8, 0, 6, 0, 0, 0]
-]
-#action, number, row, col
+def isSudokuValid(sudoku):
+    #Check unit by unit
+    valid = [x for x in range(1, 10)]
+    
+    #Row
+    for r in range(9):
+        tmp = sorted(sudoku[r])
+        if(tmp != valid):
+            return False
+    
+    #Col
+    for c in range(9):
+        tmp = []
+        for r in range(9):
+            tmp.append(sudoku[r][c])
+        tmp = sorted(tmp)
+
+        if(tmp != valid):
+            return False
+    
+    #Box
+    for b in range(9):
+        box = getBoxXYFromBoxNum(b)
+        tmp = []
+        for gr in range(box[1], box[1] + 3):
+            for gc in range(box[0], box[0] + 3):
+                tmp.append(sudoku[gr][gc])
+        tmp = sorted(tmp)
+
+        if(tmp != valid):
+            return False
+
+    return True
+
+
+#Main Program
+#Skill, x, y, number
 action_log = []
-
-print("Original:")
-print_map(map)
-
-#Start checking
-eliminating_number(map, action_log)
 '''
-while True:
-    if(scanning(map, action_log)): continue
-    if(single_candidate(map, action_log)): continue
+original_sudoku = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0]
+]
+'''
+original_sudoku = [
+    [0, 0, 0, 8, 2, 0, 6, 0, 0],
+    [5, 0, 0, 0, 0, 0, 0, 0, 0],
+    [3, 8, 0, 7, 0, 0, 0, 0, 2],
+    [0, 0, 6, 4, 0, 0, 0, 0, 0],
+    [8, 4, 0, 0, 0, 3, 9, 0, 0],
+    [0, 0, 5, 0, 0, 0, 0, 0, 8],
+    [0, 0, 4, 0, 0, 0, 0, 0, 0],
+    [2, 7, 0, 3, 0, 0, 0, 0, 6],
+    [0, 0, 0, 0, 0, 9, 0, 1, 0]
+]
+modified_sudoku = original_sudoku
+sudoku_note = []
+
+def debug():
+    print_sudoku(modified_sudoku)
+    pprint(action_log)
+    print_notes()
+    print()
+
+getNotes()
+while(True):
+    if(last_remaining_cell()):
+        continue
+    
+    '''
+    print("Before")
+    pprint(action_log)
+    print_notes()
+    print()
+    '''
+    if(obvious()):
+        continue
 
     break
-'''
-
-print('End, no skill can be applied')
-for action in action_log:
-    print(action['action'], ", number:", action['number'], ', row:', action['row'], ', col:', action['col'])
 
 print('End')
-print_map(map)
+if(isSudokuValid(modified_sudoku)):
+    print_sudoku(modified_sudoku)
+    print("NICEEEEEEEEE!!!!!!!!!!")
+else:
+    debug()
