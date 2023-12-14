@@ -1,4 +1,7 @@
 import time
+import itertools
+from pprint import pprint
+
 '''
 unit: box, row, col, grid
 Index: start from 0
@@ -240,10 +243,24 @@ def getNoteNumbers(sets):
 
 def print_notes():
     for r in range(9):
-        print("-"*10)
         for c in range(9):
             numbers = getNoteNumbers(sudoku_note[r][c])
             print("X:", c, ", Y:", r, ":", numbers)
+
+def getDistinctNumberNotes(notes):
+    found = []
+    for i in range(len(notes)):
+        for k in range(len(notes[i])):
+            if(not notes[i][k] in found):
+                found.append(notes[i][k])
+    return found
+
+#Note2 is subset of note1
+def isSubset(note1, note2):
+    for i in range(len(note2)):
+        if(not note2[i] in note1):
+            return False
+    return True
 
 def obvious():
     #Loop through grid and get all notes
@@ -258,19 +275,12 @@ def obvious():
                     r,
                     sudoku_note[r][c].index(0) + 1
                 ])
-                #getNotes()  #Reset notes
-                return False
+                getNotes()  #Reset notes
+                return True
 
-    #Pairs or Triples
+    #Pairs
     '''
     obvious pairs: check empty & remove other have same numbers
-    condition: have two same combination in same row/col/grid
-        obvious triples:
-        condition:
-        (123) (123) (123) - {3/3/3} (in terms of candidates per cell)
-        (123) (123) (12) - {3/3/2} (or some combination thereof)
-        (123) (12) (23) - {3/2/2}
-        (12) (23) (13) - {2/2/2}
     '''
     for r in range(9):
         for c in range(9):
@@ -305,23 +315,70 @@ def obvious():
 
                 #If yes, then remove same unit other notes
                 if(same_notes != 0):
-                    #Add records
-                    action_log.append([
-                        "obvious_pairs",
-                        same_notes_grid,
-                        pairs_number
-                    ])
-
                     #Remove
+                    removed = False
                     #Box
                     for gr in range(box[1], box[1] + 3):
                         for gc in range(box[0], box[0] + 3):
                             if(countElement(sudoku_note[gr][gc], 0) > 2):
                                 for i in range(2):
+                                    if(sudoku_note[gr][gc][pairs_number[i] - 1] == 0):
+                                        removed = True
                                     sudoku_note[gr][gc][pairs_number[i] - 1] = 1
 
-                    #Let's go again
-                    return True  #End
+                    #Row
+                    for gr in range(9):
+                        if(countElement(sudoku_note[gr][c], 0) > 2):
+                            for i in range(2):
+                                if(sudoku_note[gr][c][pairs_number[i] - 1] == 0):
+                                        removed = True
+                                sudoku_note[gr][c][pairs_number[i] - 1] = 1
+
+                    #Col
+                    for gc in range(9):
+                        if(countElement(sudoku_note[r][gc], 0) > 2):
+                            for i in range(2):
+                                if(sudoku_note[r][gc][pairs_number[i] - 1] == 0):
+                                        removed = True
+                                sudoku_note[r][gc][pairs_number[i] - 1] = 1
+
+                    if(removed):
+                        #Add records
+                        action_log.append([
+                            "obvious_pairs",
+                            same_notes_grid,
+                            pairs_number
+                        ])
+
+                        return True
+                
+    #Triples
+    '''
+    condition: have two same combination in same row/col/grid
+        obvious triples:
+        condition:
+        (123) (123) (123) - {3/3/3} (in terms of candidates per cell)
+        (123) (123) (12) - {3/3/2} (or some combination thereof)å
+        (123) (12) (23) - {3/2/2}
+        (12) (23) (13) - {2/2/2}
+    '''
+    #Loop over unit
+    #Get all box notes
+    #Loop all combination
+    #Get distinct set, check if length = 3
+    #Box
+    for b in range(9):
+        box = getBoxXYFromBoxNum(b)
+        box_notes = []
+        for gr in range(box[1], box[1] + 3):
+            for gc in range(box[0], box[0] + 3):
+                box_notes.append(sudoku_note[gr][gc])
+        box_notes_combination = [list(p) for p in itertools.combinations(box_notes, 3)]
+        for i in range(len(box_notes_combination)):
+            distinct_notes = getDistinctNumberNotes(box_notes_combination[i])
+            if(len(distinct_notes) == 3):
+                print(box_notes_combination[i])
+                return True
 
     return False
 
@@ -363,9 +420,10 @@ print(action_log)
 '''
 
 def debug():
-    print_notes()
     print_sudoku(modified_sudoku)
-    print(action_log)
+    pprint(action_log)
+    print_notes()
+    print()
 
 '''
 getNotes()
@@ -378,13 +436,13 @@ print_notes()
 print()
 while(True):
     if(last_remaining_cell()): 
-        debug()
-        time.sleep(6)
+        pprint(action_log)
+        #time.sleep(6)
         continue
 
     if(obvious()):
-        debug()
-        time.sleep(6)
+        pprint(action_log)
+        #time.sleep(6)
         continue
 
     break
