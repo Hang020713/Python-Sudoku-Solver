@@ -267,121 +267,137 @@ def obvious():
     '''
     for r in range(9):
         for c in range(9):
-            #Pairs
+            #First, find a note with only length is 2
             if(countElement(sudoku_note[r][c], 0) == 2):
-                print("There is pairs,", c, r, sudoku_note[r][c])
                 removed = False
                 same_notes_grid = [
                     [c, r]
                 ]
                 pairs_number = getNoteNumbers(sudoku_note[r][c])
-
-                #Check have other grid, row, col notes have same numbers
-                #Box
-                box = getBoxXYFromXY(c, r)
-                print("Checking box:", box)
-                for gr in range(box[1], box[1] + 3):
-                    for gc in range(box[0], box[0] + 3):
-                        if(sudoku_note[r][c] == sudoku_note[gr][gc] and gr != r and gc != c):
-                            print("Same:", c, r, gc, gr, sudoku_note[gr][gc])
-                            #Remove same number of box
-                            for rr in range(box[1], box[1] + 3):
-                                for cc in range(box[0], box[0] + 3):
-                                    if(sudoku_note[rr][cc] != sudoku_note[gr][gc] and modified_sudoku[rr][cc] == 0):
-                                        for i in range(2):
-                                            if(sudoku_note[rr][cc][pairs_number[i] - 1] == 0):
-                                                removed = True
-                                            sudoku_note[rr][cc][pairs_number[i] - 1] = 1
-
+                removed_location = []
+                
+                #Then find another more pair is same notes, with same unit
+                #If so, then remove other same number from same unit notes
+                #Row
+                for rr in range(9):
+                    if(countElement(sudoku_note[rr][c], 0) == 2 
+                       and sudoku_note[r][c] == sudoku_note[rr][c] 
+                       and rr != r):
+                        print("found row match")
+                        print(c, rr, sudoku_note[rr][c])
+                        print(c, r, sudoku_note[r][c])
+                        same_notes_grid.append([c, rr])
+                        
+                        #Is them the same box?
+                        if(getBoxNumFromXY(c, r) == getBoxNumFromXY(c, rr)):
+                            box = getBoxXYFromXY(c, r)
+                            for gr in range(box[1], box[1] + 3):
+                                for gc in range(box[0], box[0] + 3):
+                                    #Check it's not r and rr
+                                    if(gc == c and (gr == r or gr == rr)):
+                                        continue
+                                    #Also not filled blank
+                                    if(modified_sudoku[gr][gc] != 0):
+                                        continue
+                                        
+                                    #Remove if they noted
+                                    for i in range(len(pairs_number)):
+                                        if(sudoku_note[gr][gc][pairs_number[i] - 1] == 0):
+                                            removed = True
+                                            removed_location.append([gc, gr])
+                                        sudoku_note[gr][gc][pairs_number[i] - 1] = 1
                             if(removed):
-                                same_notes_grid.append([gc, gr])
                                 action_log.append([
-                                    "obvious_pairs",
+                                    "obvious_pairs_box",
                                     same_notes_grid,
-                                    pairs_number
+                                    pairs_number,
+                                    removed_location
                                 ])
                                 return True
 
-                #Row
-                for gr in range(9):
-                    if(sudoku_note[r][c] == sudoku_note[gr][c] and gr != r):
-                        #Remove row same number
-                        for rr in range(9):
-                            if(countElement(sudoku_note[rr][c], 0) > 2):
-                                for i in range(2):
-                                    if(sudoku_note[rr][c][pairs_number[i] - 1] == 0):
-                                            removed = True
-                                    sudoku_note[rr][c][pairs_number[i] - 1] = 1
+                        #Clear Row
+                        for rrr in range(9):
+                            if(rrr == rr or rrr == r):
+                                continue
+                            if(modified_sudoku[rrr][c] != 0):
+                                continue
+
+                            for i in range(len(pairs_number)):
+                                if(sudoku_note[rrr][c][pairs_number[i] - 1] == 0):
+                                    removed = True
+                                    removed_location.append([c, rrr])
+                                sudoku_note[rrr][c][pairs_number[i] - 1] = 1
                         if(removed):
-                            same_notes_grid.append([c, gr])
                             action_log.append([
-                                "obvious_pairs",
+                                "obvious_pairs_row",
                                 same_notes_grid,
-                                pairs_number
+                                pairs_number,
+                                removed_location
                             ])
                             return True
-                
+
                 #Col
-                for gc in range(9):
-                    if(sudoku_note[r][c] == sudoku_note[r][gc] and gc != c):
-                        #Remove col same number
-                        for cc in range(9):
-                            if(countElement(sudoku_note[r][cc], 0) > 2):
-                                for i in range(2):
-                                    if(sudoku_note[r][cc][pairs_number[i] - 1] == 0):
+                for cc in range(9):
+                    if(countElement(sudoku_note[r][cc], 0) == 2
+                       and sudoku_note[r][c] == sudoku_note[r][cc]
+                       and cc != c):
+                        print("found col match")
+                        print(c, r, sudoku_note[r][c])
+                        print(cc, r, sudoku_note[r][cc])
+                        same_notes_grid.append([cc, r])
+
+                        #Is them the same box?
+                        if(getBoxNumFromXY(c, r) == getBoxNumFromXY(cc, r)):
+                            box = getBoxXYFromXY(c, r)
+                            for gr in range(box[1], box[1] + 3):
+                                for gc in range(box[0], box[0] + 3):
+                                    #Check it's not r and rr
+                                    if(gr == r and (gc == c or gc == cc)):
+                                        continue
+                                    #Also not filled blank
+                                    if(modified_sudoku[gr][gc] != 0):
+                                        continue
+                                        
+                                    #Remove if they noted
+                                    for i in range(len(pairs_number)):
+                                        if(sudoku_note[gr][gc][pairs_number[i] - 1] == 0):
                                             removed = True
-                                    sudoku_note[r][cc][pairs_number[i] - 1] = 1
+                                            removed_location.append([gc, gr])
+                                        sudoku_note[gr][gc][pairs_number[i] - 1] = 1
+                            if(removed):
+                                action_log.append([
+                                    "obvious_pairs_box",
+                                    same_notes_grid,
+                                    pairs_number,
+                                    removed_location
+                                ])
+                                return True
+
+                        #Clear Col
+                        for ccc in range(9):
+                            if(ccc == cc or ccc == c):
+                                continue
+                            if(modified_sudoku[r][ccc] != 0):
+                                continue
+
+                            for i in range(len(pairs_number)):
+                                if(sudoku_note[r][ccc][pairs_number[i] - 1] == 0):
+                                    removed = True
+                                    removed_location.append([ccc, r])
+                                sudoku_note[r][ccc][pairs_number[i] - 1] = 1
                         if(removed):
-                            same_notes_grid.append([cc, r])
                             action_log.append([
-                                "obvious_pairs",
+                                "obvious_pairs_col",
                                 same_notes_grid,
-                                pairs_number
+                                pairs_number,
+                                removed_location
                             ])
                             return True
 
-                '''
-                #If yes, then remove same unit other notes
-                if(same_notes != 0):
-                    #Remove
-                    removed = False
-
-                    #Box
-                    for gr in range(box[1], box[1] + 3):
-                        for gc in range(box[0], box[0] + 3):
-                            if(countElement(sudoku_note[gr][gc], 0) > 2):
-                                for i in range(2):
-                                    if(sudoku_note[gr][gc][pairs_number[i] - 1] == 0):
-                                        removed = True
-                                    sudoku_note[gr][gc][pairs_number[i] - 1] = 1
-
-                    #Row
-                    for gr in range(9):
-                        if(countElement(sudoku_note[gr][c], 0) > 2):
-                            for i in range(2):
-                                if(sudoku_note[gr][c][pairs_number[i] - 1] == 0):
-                                        removed = True
-                                sudoku_note[gr][c][pairs_number[i] - 1] = 1
-
-                    #Col
-                    for gc in range(9):
-                        if(countElement(sudoku_note[r][gc], 0) > 2):
-                            for i in range(2):
-                                if(sudoku_note[r][gc][pairs_number[i] - 1] == 0):
-                                        removed = True
-                                sudoku_note[r][gc][pairs_number[i] - 1] = 1
-
-                    if(removed):
-                        #Add records
-                        action_log.append([
-                            "obvious_pairs",
-                            same_notes_grid,
-                            pairs_number
-                        ])
-
-                        return True
-                '''
-                
+                #Box
+                for b in range(9):
+                    box = getBoxXYFromBoxNum(b)
+    
     #Triples
     '''
     condition: have two same combination in same row/col/grid
@@ -392,13 +408,8 @@ def obvious():
         (123) (12) (23) - {3/2/2}
         (12) (23) (13) - {2/2/2}
     '''
-    #Loop over unit
-    #Get all box notes
-    #Loop all combination
-    #Get distinct set, check if length = 3
-    #Box
-    '''
     for b in range(9):
+        removed_location = []
         box = getBoxXYFromBoxNum(b)
         box_notes = []
         for gr in range(box[1], box[1] + 3):
@@ -409,18 +420,80 @@ def obvious():
             #Check all notes have at least length 2
             check = False
             for k in range(3):
-                if(len(box_notes_combination[i][k]) < 2):
+                if(len(box_notes_combination[i][k]) < 2 or len(box_notes_combination[i][k]) > 3):
                     check = True
             if(check):
                 continue
 
             distinct_notes = getDistinctNumberNotes(box_notes_combination[i])
             if(len(distinct_notes) == 3):
-                print("Found", box_notes_combination[i])
-                return False
-    '''
+                print("Found Triples", box_notes_combination[i], distinct_notes)
+
+                #Remove same number from box
+                for gr in range(box[1], box[1] + 3):
+                    for gc in range(box[0], box[0] + 3):
+                        #Loop distinct notes
+                        if(modified_sudoku[gr][gc] != 0):
+                            continue
+
+                        if(not isSubset(distinct_notes, sudoku_note[gr][gc])):
+                            #Remove number!
+                            removed = False
+
+                            for n in range(3):
+                                if(sudoku_note[gr][gc][distinct_notes[n] - 1] == 0):
+                                    removed = True
+                                    removed_location.append([gc, gr])
+                                sudoku_note[gr][gc][distinct_notes[n] - 1] = 1
+                            
+                            if(removed):
+                                action_log.append([
+                                    "obvious_triples_box",
+                                    same_notes_grid,
+                                    [
+                                        b
+                                        ,box_notes_combination[i]
+                                    ],
+                                    removed_location
+                                ])
+                                return True
 
     return False
+
+def isSudokuValid(sudoku):
+    #Check unit by unit
+    valid = [x for x in range(1, 10)]
+    
+    #Row
+    for r in range(9):
+        tmp = sorted(sudoku[r])
+        if(tmp != valid):
+            return False
+    
+    #Col
+    for c in range(9):
+        tmp = []
+        for r in range(9):
+            tmp.append(sudoku[r][c])
+        tmp = sorted(tmp)
+
+        if(tmp != valid):
+            return False
+    
+    #Box
+    for b in range(9):
+        box = getBoxXYFromBoxNum(b)
+        tmp = []
+        for gr in range(box[1], box[1] + 3):
+            for gc in range(box[0], box[0] + 3):
+                tmp.append(sudoku[gr][gc])
+        tmp = sorted(tmp)
+
+        if(tmp != valid):
+            return False
+
+    return True
+
 
 #Main Program
 #Skill, x, y, number
@@ -439,25 +512,18 @@ original_sudoku = [
 ]
 '''
 original_sudoku = [
-    [4, 0, 0, 0, 0, 0, 9, 3, 8],
-    [0, 3, 2, 0, 9, 4, 1, 0, 0],
-    [0, 9, 5, 3, 0, 0, 2, 4, 0],
-    [3, 7, 0, 6, 0, 9, 0, 0, 4],
-    [5, 2, 9, 0, 0, 1, 6, 7, 3],
-    [6, 0, 4, 7, 0, 3, 0, 9, 0],
-    [9, 5, 7, 0, 0, 8, 3, 0, 0],
-    [0, 0, 3, 9, 0, 0, 4, 0, 0],
-    [2, 4, 0, 0, 3, 0, 7, 0, 9]
+    [0, 0, 0, 8, 2, 0, 6, 0, 0],
+    [5, 0, 0, 0, 0, 0, 0, 0, 0],
+    [3, 8, 0, 7, 0, 0, 0, 0, 2],
+    [0, 0, 6, 4, 0, 0, 0, 0, 0],
+    [8, 4, 0, 0, 0, 3, 9, 0, 0],
+    [0, 0, 5, 0, 0, 0, 0, 0, 8],
+    [0, 0, 4, 0, 0, 0, 0, 0, 0],
+    [2, 7, 0, 3, 0, 0, 0, 0, 6],
+    [0, 0, 0, 0, 0, 9, 0, 1, 0]
 ]
 modified_sudoku = original_sudoku
 sudoku_note = []
-
-'''
-getNotes()
-obvious()
-print_sudoku(modified_sudoku)
-print(action_log) 
-'''
 
 def debug():
     print_sudoku(modified_sudoku)
@@ -465,24 +531,25 @@ def debug():
     print_notes()
     print()
 
-'''
-getNotes()
-obvious()
-debug()
-'''
-
 getNotes()
 while(True):
-    if(last_remaining_cell()): 
-        #pprint(action_log)
-        #time.sleep(6)
+    if(last_remaining_cell()):
         continue
-
+    
+    '''
+    print("Before")
+    pprint(action_log)
+    print_notes()
+    print()
+    '''
     if(obvious()):
-        #pprint(action_log)
-        #time.sleep(6)
         continue
 
     break
+
 print('End')
-debug()
+if(isSudokuValid(modified_sudoku)):
+    print_sudoku(modified_sudoku)
+    print("NICEEEEEEEEE!!!!!!!!!!")
+else:
+    debug()
