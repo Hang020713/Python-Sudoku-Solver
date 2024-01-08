@@ -576,7 +576,9 @@ for i in range(9):
         hints.append(original_sudoku[i][k])
 csp_answers = csp_solve(hints)
 print(pretty(csp_answers[0]))
-print(len(csp_answers))
+print("length:", len(csp_answers))
+if(len(csp_answers) == 0 or len(csp_answers) > 1):
+    print("invalid sudoku")
 
 def debug():
     print_sudoku(modified_sudoku)
