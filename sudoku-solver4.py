@@ -1,6 +1,8 @@
 import time
 import itertools
 from pprint import pprint
+from constraint import *
+import random
 
 '''
 unit: box, row, col, grid
@@ -11,6 +13,7 @@ Box: 0 1 2
 sudoku[y][x]
 '''
 
+'''------Solver-----'''
 '''Helper functions'''
 def create_empty_sudoku():
     sudoku = []
@@ -460,6 +463,48 @@ def obvious():
 
     return False
 
+'''-----CSP Solver-----'''
+def csp_solve(hints):
+    ROWS = 'abcdefghi'
+    COLS = '123456789'
+    DIGITS = range(1, 10)
+
+    VARS = [row + col for row in ROWS for col in COLS]
+    ROWGROUPS = [[row + col for col in COLS] for row in ROWS]
+    COLGROUPS = [[row + col for row in ROWS] for col in COLS]
+
+    SQUAREGROUPS = [
+        [ROWS[3 * rowgroup + k] + COLS[3 * colgroup + j]
+        for j in range(3) for k in range(3)]
+        for colgroup in range(3) for rowgroup in range(3)
+    ]
+
+    problem = Problem()
+
+    for var, hint in zip(VARS, hints):
+        problem.addVariables([var], [hint] if hint in DIGITS else DIGITS)
+
+    for vargroups in [ROWGROUPS, COLGROUPS, SQUAREGROUPS]:
+        for vargroup in vargroups:
+            problem.addConstraint(AllDifferentConstraint(), vargroup)
+
+    return problem.getSolutions()
+
+def pretty(var_to_value):
+    board = ''
+    for rownum, row in enumerate('abcdefghi'):
+        for colnum, col in enumerate('123456789'):
+            board += str(var_to_value[row+col]) + ' '
+            if colnum % 3 == 2:
+                board += ' '
+
+        board += '\n'
+        if rownum % 3 == 2:
+            board += '\n'
+
+    return board
+
+'''------Validator-----'''
 def isSudokuValid(sudoku):
     #Check unit by unit
     valid = [x for x in range(1, 10)]
@@ -494,8 +539,7 @@ def isSudokuValid(sudoku):
 
     return True
 
-
-#Main Program
+'''------Main Program-----'''
 #Skill, x, y, number
 action_log = []
 '''
@@ -522,8 +566,17 @@ original_sudoku = [
     [2, 7, 0, 3, 0, 0, 0, 0, 6],
     [0, 0, 0, 0, 0, 9, 0, 1, 0]
 ]
-modified_sudoku = original_sudoku
+modified_sudoku = original_sudoku.copy()
 sudoku_note = []
+    
+print("[csp time]")
+hints = []
+for i in range(9):
+    for k in range(9):
+        hints.append(original_sudoku[i][k])
+csp_answers = csp_solve(hints)
+print(pretty(csp_answers[0]))
+print(len(csp_answers))
 
 def debug():
     print_sudoku(modified_sudoku)
@@ -552,4 +605,5 @@ if(isSudokuValid(modified_sudoku)):
     print_sudoku(modified_sudoku)
     print("NICEEEEEEEEE!!!!!!!!!!")
 else:
+    print("FUCKKKKKKKKKK")
     debug()
